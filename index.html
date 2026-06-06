@@ -10,17 +10,33 @@
   <div class="container">
     <header>
       <div class="logo">⚡ AI Prompt Playground</div>
-      <p class="tagline">Learn to write <strong>better prompts</strong> with instant feedback</p>
+      <p class="tagline">Learn to write <strong>better prompts</strong> with real AI feedback</p>
     </header>
+
+    <!-- API Key Banner -->
+    <div class="api-banner">
+      <div class="api-banner-inner">
+        <span>🤖 Enable AI-powered rewriting with <strong>Google Gemini</strong> (free)</span>
+        <div class="api-input-row">
+          <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key here" />
+          <button onclick="saveApiKey()">Save Key</button>
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" class="get-key-link">Get free key ↗</a>
+        </div>
+        <p class="api-note">🔒 Your key stays in your browser only. Never sent anywhere.</p>
+      </div>
+    </div>
+
+    <!-- Mode Toggle -->
+    <div class="mode-toggle">
+      <button id="btnRule" class="mode-btn active" onclick="setMode('rule')">⚡ Rule-Based (Offline)</button>
+      <button id="btnAI"   class="mode-btn"        onclick="setMode('ai')">🤖 AI Rewrite (Gemini)</button>
+      <span class="mode-status" id="modeStatus">Offline mode</span>
+    </div>
 
     <main>
       <section class="input-section">
         <label for="promptInput">Enter your prompt below:</label>
-        <textarea
-          id="promptInput"
-          rows="5"
-          placeholder="e.g. Write a summary of this article."
-        ></textarea>
+        <textarea id="promptInput" rows="5" placeholder="e.g. Write a summary of this article."></textarea>
         <button id="analyzeBtn" onclick="analyzePrompt()">🔍 Analyze Prompt</button>
       </section>
 
@@ -29,21 +45,21 @@
           <h2>⚠️ Issues Found</h2>
           <ul id="issuesList"></ul>
         </div>
-
         <div class="card score-card">
           <h2>📊 Prompt Score</h2>
-          <div class="score-circle" id="scoreCircle">
+          <div class="score-circle">
             <span id="scoreValue">0</span><span>/10</span>
           </div>
           <p id="scoreLabel"></p>
         </div>
-
         <div class="card suggestions-card">
-          <h2>✅ Improved Prompt</h2>
+          <h2>✅ Improved Prompt <span class="ai-badge" id="aiBadge" style="display:none">🤖 AI</span></h2>
+          <div class="loader" id="loader" style="display:none">
+            <div class="spinner"></div><span>Gemini is rewriting your prompt…</span>
+          </div>
           <div class="improved-prompt" id="improvedPrompt"></div>
           <button class="copy-btn" onclick="copyImproved()">📋 Copy Improved Prompt</button>
         </div>
-
         <div class="card tips-card">
           <h2>💡 Prompt Engineering Tips</h2>
           <ul id="tipsList"></ul>
@@ -57,7 +73,7 @@
     </main>
 
     <footer>
-      <p>Built by <a href="https://rohith-portfolio-six.vercel.app/" target="_blank">Matam Rohith</a> &mdash; No backend. Pure JS magic ✨</p>
+      <p>Built by <a href="https://rohith-portfolio-six.vercel.app/" target="_blank">Matam Rohith</a> &mdash; Powered by Gemini AI + Rule Engine ✨</p>
     </footer>
   </div>
 
