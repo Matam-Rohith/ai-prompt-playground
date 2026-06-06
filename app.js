@@ -109,7 +109,11 @@ async function geminiRewrite(original, issues) {
     }]
   };
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!res.ok) { const e = await res.json(); throw new Error(e?.error?.message || 'Gemini API error'); }
+  if (!res.ok) {
+    const e = await res.json();
+    const msg = e?.error?.message || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'No response from Gemini.';
 }
@@ -160,7 +164,7 @@ async function analyzePrompt() {
     } catch (err) {
       improvedEl.textContent = ruleRewrite(input, triggered);
       improvedEl.style.borderColor = '#f59e0b';
-      showToast('AI failed — used rule-based fallback', '#f59e0b');
+      showToast(`❌ ${err.message}`, '#ef4444', 6000);
     } finally {
       loaderEl.style.display = 'none';
       copyBtn.style.display  = 'inline-block';
@@ -182,12 +186,12 @@ function copyImproved() {
     .then(() => showToast('Copied! ✅'));
 }
 
-// ─ Toast
-function showToast(msg, color = '#10b981') {
+// ─ Toast (duration param added)
+function showToast(msg, color = '#10b981', duration = 2800) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.style.background = color;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2800);
+  setTimeout(() => t.classList.remove('show'), duration);
 }
 
 // ─ Examples
