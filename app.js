@@ -1,6 +1,6 @@
 // ─ State
 let currentMode = 'rule';
-let geminiKey = localStorage.getItem('gemini_api_key') || '';
+let geminiKey = localStorage.getItem('AQ.Ab8RN6I2W8CeuNqHpywYnY1EQvJFHBvfPIl60Swtitptw9XoRg') || '';
 
 window.addEventListener('DOMContentLoaded', () => {
   if (geminiKey) document.getElementById('apiKeyInput').value = geminiKey;
