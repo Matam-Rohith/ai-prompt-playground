@@ -40,6 +40,23 @@ function saveApiKey() {
   setMode('ai');
 }
 
+async function testApiKey() {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if (!val) { showToast('Paste your API key first!', '#f59e0b'); return; }
+  showToast('🔍 Testing key…', '#6366f1', 5000);
+  try {
+    const result = await callGemini('Say: OK', val);
+    if (result) {
+      geminiKey = val;
+      localStorage.setItem('gemini_api_key', val);
+      showToast('✅ Key works! AI mode enabled.', '#10b981', 4000);
+      setMode('ai');
+    }
+  } catch (err) {
+    showToast(`❌ Key failed: ${err.message}`, '#ef4444', 7000);
+  }
+}
+
 // ─ Examples
 const EXAMPLES = [
   { label: 'Too Vague',        prompt: 'Write a summary of this article.' },
@@ -95,27 +112,37 @@ function ruleRewrite(original, issues) {
   return T[detectIntent(original)](original);
 }
 
+// ─ Core Gemini caller (tries gemini-1.5-flash, most available free model)
+async function callGemini(text, key) {
+  const MODELS = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-pro'];
+  let lastErr = null;
+  for (const model of MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const body = {
+      contents: [{ role: 'user', parts: [{ text }] }]
+    };
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) {
+        const e = await res.json();
+        lastErr = new Error(e?.error?.message || `HTTP ${res.status}`);
+        continue;
+      }
+      const data = await res.json();
+      const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (result) return result;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('All models failed');
+}
+
 // ─ Gemini AI rewriter
 async function geminiRewrite(original, issues) {
   const issueList = issues.map(i => `- ${i.issue}`).join('\n') || 'General improvement needed.';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
-  const body = {
-    systemInstruction: {
-      parts: [{ text: `You are an expert prompt engineer. Rewrite the user's weak AI prompt into a professional, precise, effective one.\nRules:\n- Do NOT add word counts or format constraints unless the user asked.\n- Rewrite naturally as a human expert would.\n- Keep the user's original intent.\n- Output ONLY the rewritten prompt. No labels, no explanation.` }]
-    },
-    contents: [{
-      role: 'user',
-      parts: [{ text: `Original prompt: "${original}"\n\nIssues:\n${issueList}\n\nRewrite:` }]
-    }]
-  };
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!res.ok) {
-    const e = await res.json();
-    const msg = e?.error?.message || `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'No response from Gemini.';
+  const prompt = `You are an expert prompt engineer. Rewrite the following weak AI prompt into a professional, precise, and effective one.\n\nRules:\n- Keep the user's original intent\n- Do NOT add word counts unless asked\n- Rewrite naturally\n- Output ONLY the rewritten prompt, no explanation\n\nOriginal prompt: "${original}"\n\nIssues with it:\n${issueList}\n\nRewrite:`;
+  return await callGemini(prompt, geminiKey);
 }
 
 // ─ Score
@@ -164,7 +191,7 @@ async function analyzePrompt() {
     } catch (err) {
       improvedEl.textContent = ruleRewrite(input, triggered);
       improvedEl.style.borderColor = '#f59e0b';
-      showToast(`❌ ${err.message}`, '#ef4444', 6000);
+      showToast(`❌ ${err.message}`, '#ef4444', 7000);
     } finally {
       loaderEl.style.display = 'none';
       copyBtn.style.display  = 'inline-block';
@@ -186,7 +213,7 @@ function copyImproved() {
     .then(() => showToast('Copied! ✅'));
 }
 
-// ─ Toast (duration param added)
+// ─ Toast
 function showToast(msg, color = '#10b981', duration = 2800) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.style.background = color;
