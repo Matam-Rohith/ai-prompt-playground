@@ -1,6 +1,6 @@
 // ─ State
 let currentMode = 'rule';
-let geminiKey = localStorage.getItem('AQ.Ab8RN6I2W8CeuNqHpywYnY1EQvJFHBvfPIl60Swtitptw9XoRg') || '';
+let geminiKey = localStorage.getItem('gemini_api_key') || '';
 
 window.addEventListener('DOMContentLoaded', () => {
   if (geminiKey) document.getElementById('apiKeyInput').value = geminiKey;
@@ -100,8 +100,13 @@ async function geminiRewrite(original, issues) {
   const issueList = issues.map(i => `- ${i.issue}`).join('\n') || 'General improvement needed.';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
   const body = {
-    system_instruction: { parts: [{ text: `You are an expert prompt engineer. Rewrite the user's weak AI prompt into a professional, precise, effective one.\nRules:\n- Do NOT add word counts or format constraints unless the user asked.\n- Rewrite naturally as a human expert would.\n- Keep the user's original intent.\n- Output ONLY the rewritten prompt. No labels, no explanation.` }] },
-    contents: [{ parts: [{ text: `Original prompt: "${original}"\n\nIssues:\n${issueList}\n\nRewrite:` }] }]
+    systemInstruction: {
+      parts: [{ text: `You are an expert prompt engineer. Rewrite the user's weak AI prompt into a professional, precise, effective one.\nRules:\n- Do NOT add word counts or format constraints unless the user asked.\n- Rewrite naturally as a human expert would.\n- Keep the user's original intent.\n- Output ONLY the rewritten prompt. No labels, no explanation.` }]
+    },
+    contents: [{
+      role: 'user',
+      parts: [{ text: `Original prompt: "${original}"\n\nIssues:\n${issueList}\n\nRewrite:` }]
+    }]
   };
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!res.ok) { const e = await res.json(); throw new Error(e?.error?.message || 'Gemini API error'); }
