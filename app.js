@@ -45,15 +45,15 @@ async function testApiKey() {
   if (!val) { showToast('Paste your API key first!', '#f59e0b'); return; }
   showToast('🔍 Testing key…', '#6366f1', 5000);
   try {
-    const result = await callGemini('Say: OK', val);
-    if (result) {
-      geminiKey = val;
-      localStorage.setItem('gemini_api_key', val);
-      showToast('✅ Key works! AI mode enabled.', '#10b981', 4000);
-      setMode('ai');
-    }
+    const result = await callGemini('Reply with just the word: WORKING', val);
+    console.log('Test result:', result);
+    geminiKey = val;
+    localStorage.setItem('gemini_api_key', val);
+    showToast('✅ Key works! AI mode enabled.', '#10b981', 4000);
+    setMode('ai');
   } catch (err) {
-    showToast(`❌ Key failed: ${err.message}`, '#ef4444', 7000);
+    console.error('Test key error:', err);
+    showToast(`❌ ${err.message}`, '#ef4444', 8000);
   }
 }
 
@@ -78,7 +78,7 @@ const RULES = [
   { id: 'vague_verb',  test: p => /^(write|make|do|give|tell|say|create|generate|produce)/i.test(p.trim()) && p.trim().split(/\s+/).length < 10,           issue: 'Vague opener — add more specifics after the action verb.',           tip: "Instead of 'Write something', say 'Write a product description for…'." },
 ];
 
-// ─ Rule-based rewriter (fallback)
+// ─ Rule-based rewriter
 function detectIntent(p) {
   if (/summar|tldr/i.test(p))              return 'summarize';
   if (/translat/i.test(p))                 return 'translate';
@@ -94,17 +94,17 @@ function detectIntent(p) {
 }
 
 const T = {
-  summarize:    ()  => 'Summarize the following content clearly and concisely. Highlight the key points, main argument, and any important conclusions. Keep the tone neutral and easy to understand.',
+  summarize:    ()  => 'Summarize the following content clearly and concisely. Highlight the key points, main argument, and any important conclusions.',
   translate:    p   => { const l = p.match(/to\s+([a-z]+)/i)?.[1]||'the target language'; return `Translate the following text into ${l}. Preserve the original meaning, tone, and formatting.`; },
-  cover_letter: p   => { const j = p.match(/for\s+(?:a\s+)?(.+)/i)?.[1]?.trim()||'the role'; return `Write a professional cover letter for ${j}. Highlight relevant skills, explain why the candidate is a strong fit, and close with a confident call to action.`; },
-  resume:       p   => { const r = p.match(/(?:for|to)\s+(.+?)(?:\s+job|\s+role|\s+jd|$)/i)?.[1]?.trim()||'the target job'; return `Tailor this resume for ${r}. Emphasize relevant skills, align experience with JD requirements, use strong action verbs, and ensure ATS compatibility.`; },
-  explain:      p   => { const t = p.replace(/explain|what is|how does|tell me about/gi,'').trim()||'this topic'; return `Explain ${t} in simple, beginner-friendly language. Start with a one-sentence definition, then break it down step by step with a real-world analogy.`; },
-  marketing:    p   => { const pr = p.replace(/give me|marketing|ideas?|for|some/gi,'').trim()||'the product'; return `Generate creative, actionable marketing ideas for ${pr}. Focus on social media, content marketing, and community engagement.`; },
-  email:        p   => { const pu = p.replace(/write|an?|email/gi,'').trim()||'this purpose'; return `Write a professional email for ${pu}. Keep it concise with a subject line, opening, main message, and a clear call to action.`; },
-  code:         p   => { const ta = p.replace(/write|create|generate|code|script|function|program/gi,'').trim()||'this task'; return `Write clean, well-commented code for ${ta}. Include error handling, follow best practices, and add a brief explanation.`; },
-  review:       p   => { const s = p.replace(/review|give feedback|critique/gi,'').trim()||'this content'; return `Review ${s} and provide structured feedback. Identify strengths, areas for improvement, and specific actionable suggestions.`; },
-  plan:         p   => { const g = p.replace(/create|make|write|plan|roadmap|strategy|for/gi,'').trim()||'the goal'; return `Create a step-by-step plan for ${g}. Break it into phases with specific actions and success metrics.`; },
-  generic:      p   => `${p.trim().replace(/\.$/, '')}. Be specific, clear, and structured. Include relevant context and examples, and focus on practical, actionable output.`,
+  cover_letter: p   => { const j = p.match(/for\s+(?:a\s+)?(.+)/i)?.[1]?.trim()||'the role'; return `Write a professional cover letter for ${j}. Highlight relevant skills and close with a confident call to action.`; },
+  resume:       p   => { const r = p.match(/(?:for|to)\s+(.+?)(?:\s+job|\s+role|\s+jd|$)/i)?.[1]?.trim()||'the target job'; return `Tailor this resume for ${r}. Emphasize relevant skills and ensure ATS compatibility.`; },
+  explain:      p   => { const t = p.replace(/explain|what is|how does|tell me about/gi,'').trim()||'this topic'; return `Explain ${t} in simple, beginner-friendly language with a real-world analogy.`; },
+  marketing:    p   => { const pr = p.replace(/give me|marketing|ideas?|for|some/gi,'').trim()||'the product'; return `Generate creative marketing ideas for ${pr} focusing on social media and content marketing.`; },
+  email:        p   => { const pu = p.replace(/write|an?|email/gi,'').trim()||'this purpose'; return `Write a professional email for ${pu} with subject line, main message, and a clear call to action.`; },
+  code:         p   => { const ta = p.replace(/write|create|generate|code|script|function|program/gi,'').trim()||'this task'; return `Write clean, well-commented code for ${ta} with error handling and best practices.`; },
+  review:       p   => { const s = p.replace(/review|give feedback|critique/gi,'').trim()||'this content'; return `Review ${s} with structured feedback: strengths, areas for improvement, and actionable suggestions.`; },
+  plan:         p   => { const g = p.replace(/create|make|write|plan|roadmap|strategy|for/gi,'').trim()||'the goal'; return `Create a step-by-step plan for ${g} broken into phases with specific actions.`; },
+  generic:      p   => `${p.trim().replace(/\.$/, '')}. Be specific, clear, and structured. Include relevant context and focus on practical, actionable output.`,
 };
 
 function ruleRewrite(original, issues) {
@@ -112,37 +112,47 @@ function ruleRewrite(original, issues) {
   return T[detectIntent(original)](original);
 }
 
-// ─ Core Gemini caller (tries gemini-1.5-flash, most available free model)
+// ─ Core Gemini caller — simplest body, tries 4 models
 async function callGemini(text, key) {
-  const MODELS = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-pro'];
-  let lastErr = null;
+  const MODELS = [
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro-latest',
+    'gemini-pro'
+  ];
+
   for (const model of MODELS) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-    const body = {
-      contents: [{ role: 'user', parts: [{ text }] }]
-    };
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text }] }]
+    });
+    console.log(`[Gemini] Trying: ${model}`);
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body
+      });
+      const data = await res.json();
+      console.log(`[Gemini] ${model} ->`, data);
       if (!res.ok) {
-        const e = await res.json();
-        lastErr = new Error(e?.error?.message || `HTTP ${res.status}`);
+        console.warn(`[Gemini] ${model} error: ${data?.error?.message}`);
         continue;
       }
-      const data = await res.json();
       const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
       if (result) return result;
     } catch (e) {
-      lastErr = e;
+      console.error(`[Gemini] ${model} exception:`, e);
     }
   }
-  throw lastErr || new Error('All models failed');
+  throw new Error('All models failed — open F12 Console for details');
 }
 
-// ─ Gemini AI rewriter
+// ─ Gemini rewriter
 async function geminiRewrite(original, issues) {
   const issueList = issues.map(i => `- ${i.issue}`).join('\n') || 'General improvement needed.';
-  const prompt = `You are an expert prompt engineer. Rewrite the following weak AI prompt into a professional, precise, and effective one.\n\nRules:\n- Keep the user's original intent\n- Do NOT add word counts unless asked\n- Rewrite naturally\n- Output ONLY the rewritten prompt, no explanation\n\nOriginal prompt: "${original}"\n\nIssues with it:\n${issueList}\n\nRewrite:`;
-  return await callGemini(prompt, geminiKey);
+  const text = `You are an expert prompt engineer. Rewrite the following weak prompt into a clear, professional, effective one. Keep the original intent. Output ONLY the improved prompt, nothing else.\n\nWeak prompt: "${original}"\n\nIssues:\n${issueList}\n\nImproved prompt:`;
+  return await callGemini(text, geminiKey);
 }
 
 // ─ Score
@@ -189,9 +199,10 @@ async function analyzePrompt() {
       improvedEl.textContent = await geminiRewrite(input, triggered);
       improvedEl.style.borderColor = '';
     } catch (err) {
+      console.error('[Gemini] Final error:', err);
       improvedEl.textContent = ruleRewrite(input, triggered);
       improvedEl.style.borderColor = '#f59e0b';
-      showToast(`❌ ${err.message}`, '#ef4444', 7000);
+      showToast(`❌ ${err.message}`, '#ef4444', 8000);
     } finally {
       loaderEl.style.display = 'none';
       copyBtn.style.display  = 'inline-block';
