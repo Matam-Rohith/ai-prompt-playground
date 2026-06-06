@@ -112,21 +112,22 @@ function ruleRewrite(original, issues) {
   return T[detectIntent(original)](original);
 }
 
-// ─ Core Gemini caller — simplest body, tries 4 models
+// ─ Core Gemini caller
+// Uses v1 (stable) endpoint. Tries newest models first.
 async function callGemini(text, key) {
-  const MODELS = [
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro-latest',
-    'gemini-pro'
+  const ATTEMPTS = [
+    { api: 'v1',     model: 'gemini-2.0-flash' },
+    { api: 'v1',     model: 'gemini-1.5-flash' },
+    { api: 'v1',     model: 'gemini-1.5-pro'   },
+    { api: 'v1beta', model: 'gemini-2.0-flash' },
+    { api: 'v1beta', model: 'gemini-1.5-flash' },
   ];
 
-  for (const model of MODELS) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-    const body = JSON.stringify({
-      contents: [{ parts: [{ text }] }]
-    });
-    console.log(`[Gemini] Trying: ${model}`);
+  let lastErr = 'Unknown error';
+  for (const { api, model } of ATTEMPTS) {
+    const url = `https://generativelanguage.googleapis.com/${api}/models/${model}:generateContent?key=${key}`;
+    const body = JSON.stringify({ contents: [{ parts: [{ text }] }] });
+    console.log(`[Gemini] Trying ${api}/${model}`);
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -134,18 +135,28 @@ async function callGemini(text, key) {
         body
       });
       const data = await res.json();
-      console.log(`[Gemini] ${model} ->`, data);
+      console.log(`[Gemini] ${api}/${model}:`, data);
       if (!res.ok) {
-        console.warn(`[Gemini] ${model} error: ${data?.error?.message}`);
+        lastErr = data?.error?.message || `HTTP ${res.status}`;
+        console.warn(`[Gemini] Failed: ${lastErr}`);
+        // If invalid key, stop immediately
+        if (res.status === 400 || res.status === 403) {
+          throw new Error(lastErr);
+        }
         continue;
       }
       const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (result) return result;
+      if (result) {
+        console.log(`[Gemini] ✅ Success: ${api}/${model}`);
+        return result;
+      }
     } catch (e) {
-      console.error(`[Gemini] ${model} exception:`, e);
+      if (e.message !== 'Unknown error') throw e; // rethrow key errors
+      console.error(`[Gemini] Exception on ${api}/${model}:`, e);
+      lastErr = e.message;
     }
   }
-  throw new Error('All models failed — open F12 Console for details');
+  throw new Error(lastErr);
 }
 
 // ─ Gemini rewriter
